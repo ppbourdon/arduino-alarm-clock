@@ -18,7 +18,7 @@ int foobar3 = 0;
 int barbar1 = 0;
 int barbar2 = 0;
 int barbar3 = 0;
-int foobarbaz = 0;
+int bazbazbaz = 0;
 int soundAlarmGlitch = 0; // this int prevents the alarm from going off when trying to change the time
 int alarmHour = 0; 
 int alarmMinute = 0;
@@ -482,13 +482,13 @@ void soundAlarm() {
    }
   }
   if(keepAlarmGoing == 1) {
-    if(foobarbaz <= 0) {
+    if(bazbazbaz <= 0) {
       digitalWrite(buzzer, HIGH);
-      foobarbaz ++;
+      bazbazbaz ++;
     }
-    if(foobarbaz == 1) {
+    if(bazbazbaz == 1) {
       digitalWrite(buzzer, LOW);
-      foobarbaz = -1;
+      bazbazbaz = -1;
     }
   }
 }
