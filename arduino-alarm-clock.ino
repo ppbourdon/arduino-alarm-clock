@@ -1,3 +1,6 @@
+#include <RTClib.h>
+#include <Wire.h>
+RTC_DS1307 rtc;
 
 #include <boarddefs.h>
 #include <ir_Lego_PF_BitStreamEncoder.h>
@@ -11,7 +14,12 @@ const int rs = 7, en = 8, d4 = 9, d5 = 10, d6 = 11, d7 = 12;
 unsigned long time_1 = 0;
 unsigned long time_2 = 0;
 unsigned long time_3 = 0;
+
 boolean clockIsRunning = true;
+boolean amFlag = false;
+boolean updateAmPm = false;
+String amPmDisplayString = "";
+
 int foobar1 = 0; //these are just random ints to help keep spots within certain functions
 int foobar2 = 0;
 int foobar3 = 0;
@@ -19,20 +27,30 @@ int barbar1 = 0;
 int barbar2 = 0;
 int barbar3 = 0;
 int foobarbaz = 0;
+
 int soundAlarmGlitch = 0; // this int prevents the alarm from going off when trying to change the time
+
 int alarmHour = 0; 
 int alarmMinute = 0;
 int alarmDayLightCheck = 0;
 int alarmSet = 0;
+
 int timeHour = 0; // seperate ints to change time
 int timeMinute = 0; // ^
-int timeDayLightCheck = 0; // this int changes the clock from AM to PM
+
 int RECV_PIN = 6;
 int buzzer = 5;
-int dayLightCheck = 0;
-int oneSecond = 58; // set starting second
-int oneMinute = 59; // set starting minute
-int oneHour = 11; // set starting hour
+int red = 4;
+int green = 3;
+int blue = 2;
+
+int currentSecond = 58; // set starting second
+int currentMinute = 59; // set starting minute
+int currentHour = 11; // set starting hour
+int currentYear = 2019;
+int currentMonth = 5;
+int currentDay = 11;
+
 int alarmCount = 0;
 int clockDisplayPosition = 0;
 int soundAlarmCount = 0;
@@ -41,15 +59,22 @@ int downArrowPressed = 0;
 int stopAlarmCount = 0;
 int controlLightCount =0;
 int keepAlarmGoing = 0;
-int red = 4;
-int green = 3;
-int blue = 2;
+
 int LEDstatus = 0;
+
+int snoozeTime = 8;
+int pressSnoozeOnce = 0;
+int blinkSnoozeTime = 0;
+int snoozeFoo = 0;
+int pressSnoozeButton = -1;
+
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
 void setup() {
+  Wire.begin();
+  rtc.begin();
   pinMode(red, OUTPUT);
   pinMode(green, OUTPUT);
   pinMode(blue, OUTPUT);
@@ -59,91 +84,95 @@ void setup() {
   alarmDisplay();
 }
 
+void toggleAmPm() {
+  DateTime now = rtc.now();
+
+  if(now.hour() == 12 && now.minute() == 0 && now.second() == 0) {
+    if(amPmDisplayString == " am") {
+      amPmDisplayString = " pm";
+    } else {
+      amPmDisplayString = " am";
+    }
+  }
+}
+
+void printAmPm() {
+    toggleAmPm();
+    if(updateAmPm) {
+      lcd.setCursor(10, 0);
+      lcd.print(amPmDisplayString);      
+    }
+}
+
+void printPaddedHour(int hour) {
+  lcd.setCursor(2,0);
+
+  if(hour < 10) {
+    lcd.print("0");
+    lcd.setCursor(3,0);
+  }
+
+  lcd.print(hour, DEC);
+}
+
+void printHourMinuteColon() {
+  lcd.setCursor(4,0);
+  lcd.print(":");
+}
+
+void printPaddedMinute(int minute) {
+   lcd.setCursor(5,0);
+
+  if(minute < 10) {
+    lcd.print("0");
+    lcd.setCursor(6,0);
+  }
+
+  lcd.print(minute, DEC);
+}
+
+void printMinuteSecondColon() {
+  lcd.setCursor(7, 0);
+  lcd.print(":");
+}
+
+void printPaddedSecond() {
+  lcd.setCursor(8,0);
+
+  if(rtc.now().second() < 10) {
+    lcd.print("0");
+    lcd.setCursor(9,0);
+  }
+
+  lcd.print(rtc.now().second(), DEC);
+}
+
+void printTime() {
+    printPaddedHour(rtc.now().hour());
+    printHourMinuteColon();
+    printPaddedMinute(rtc.now().minute());
+    printMinuteSecondColon();
+    printPaddedSecond();
+    printAmPm(); 
+}
+
 void Clock() {
   if(clockIsRunning) {
-    if(oneSecond >= 60) {
-      oneSecond = 0;
-      oneMinute ++;
-    }
-    if(oneMinute >= 60) {
-      oneMinute = 0;
-      oneHour ++;
-    }
-    if(oneHour == 12) {
-      if(oneMinute == 0) {
-        if(oneSecond == 0) {
-          dayLightCheck ++;
-        }
-      }
-    }
-    if(oneHour >= 13) {
-      oneHour = 1;
-    }
-    if(dayLightCheck == 1) {
-      lcd.setCursor(10, 0);
-      lcd.print(" pm");
-      dayLightCheck = -1;
-    } 
-    if(dayLightCheck == 0) {
-      lcd.setCursor(10,0);
-      lcd.print(" am");
-    }
-    if(oneHour < 10) {
-      lcd.setCursor(3,0);
-      lcd.print(oneHour);
-      lcd.setCursor(2,0);
-      lcd.print("0");
-    } else {
-      lcd.setCursor(2,0);
-      lcd.print(oneHour);
-    } 
-    if(oneMinute < 10) {
-      lcd.setCursor(6,0);
-      lcd.print(oneMinute);
-      lcd.setCursor(5,0);
-      lcd.print("0");
-      lcd.setCursor(4,0);
-      lcd.print(":");
-    } else {
-      lcd.setCursor(5,0);
-      lcd.print(oneMinute);
-      lcd.setCursor(4,0);
-      lcd.print(":");
-    }
-    if(oneSecond < 10) {
-      lcd.setCursor(9,0);
-      lcd.print(oneSecond);
-      lcd.setCursor(8,0);
-      lcd.print("0");
-      lcd.setCursor(7,0);
-      lcd.print(":");
-      oneSecond ++;
-    } else {
-      lcd.setCursor(8,0);
-      lcd.print(oneSecond);
-      lcd.setCursor(7,0);
-      lcd.print(":");
-      oneSecond ++;
-    }
+    printTime();
   }
 }
 
 void alarmDisplay() {
   lcd.setCursor(0,1);
-  lcd.print("Alarm >");
+  lcd.print("Alarm > ");
 }
 
 void positionClockDisplay() {
   if(clockIsRunning) {
     stopClock();
-    initClockDisplay();
   }
 
-  clockDisplayPosition ++;
-  if(clockDisplayPosition == 4){
-    resetClockDisplayData();
-    startClock();
-  }
+  initClockDisplay();
 }
 
 void stopClock() {
@@ -151,17 +180,107 @@ void stopClock() {
 }
 
 void startClock() {
+  rtc.adjust(DateTime(currentYear, currentMonth, currentDay, currentHour, currentMinute, currentSecond));
   clockIsRunning = true;
 }
 
+void setClockDisplay() {
+	if(clockDisplayPosition == 0) { // start state
+		initClockDisplay();
+	}
+	if(clockDisplayPosition == 1) { // hour state
+		setClockHour();
+	}
+	if(clockDisplayPosition == 2) { // minute state
+		setClockMinute();
+	}
+	if(clockDisplayPosition == 3) { // ampm state
+		setClockAmPm();
+	}
+}
+
 void initClockDisplay() {
-    lcd.setCursor(2,0);
-    lcd.print("00:00 am         ");
-    oneHour = 0;
-    oneMinute = 0;
-    oneSecond = 0;
-    dayLightCheck = 0;
+   	lcd.setCursor(2,0);
+   	lcd.print("00:00 am         ");
+
+    currentHour = 0;
+    currentMinute = 0;
+    currentSecond = 0;
     soundAlarmGlitch = 1;  
+}
+
+void incrementTimeHour() {
+	if(timeHour == 12)
+		timeHour = 1; 
+	else
+		timeHour ++;
+}
+
+void decrementTimeHour() {
+	if(timeHour == 1) 
+		timeHour = 12; 
+	else
+		timeHour --;	
+}
+
+void incrementTimeMinute() {
+	if(timeMinute == 59)
+		timeMinute = 0;
+	else
+		timeMinute ++;
+}
+
+void decrementTimeMinute() {
+	if(timeMinute == 0) 
+		timeMinute = 59; 
+	else
+		timeMinute --;	
+}
+
+void toggleTimeAmPm() {
+	if(amPmDisplayString == " am")
+		amPmDisplayString = " pm";
+	else
+		amPmDisplayString = " am";
+}
+
+void setClockHour() {
+	printPaddedHour(timeHour);
+
+	if(upArrowPressed == 1)
+		incrementTimeHour();
+
+	if(downArrowPressed == 1)
+		decrementTimeHour();
+
+	incrementDisplayPosition();
+}
+
+void setClockMinute() {
+	printPaddedMinute(timeMinute);
+
+	if(upArrowPressed == 1)
+		incrementTimeMinute();
+
+	if(downArrowPressed == 1)
+		decrementTimeMinute();
+
+	incrementDisplayPosition();
+}
+
+void setClockAmPm() {
+	toggleTimeAmPm();	
+	setAMPM();
+	
+	incrementDisplayPosition();
+}
+
+void incrementDisplayPosition() {
+	if(clockDisplayPosition == 4) {
+		clockDisplayPosition = 0;
+	} else {
+		clockDisplayPosition ++;
+	}
 }
 
 void resetClockDisplayData() {
@@ -171,25 +290,32 @@ void resetClockDisplayData() {
     soundAlarmGlitch = 0;  
 }
 
+void setAMPM() {
+	lcd.setCursor(8,0);
+	lcd.print(amPmDisplayString);
+
+	updateAmPm = true;
+}
+
 void setTime() {
   if(clockDisplayPosition == 1) {
      if(upArrowPressed == 1) {
-       if(timeHour == 12) {
+       if(timeHour >= 12) {
         lcd.setCursor(2,0);
         lcd.print("01");
         timeHour = 0;
-        oneHour = 0;
+        currentHour = 0;
        } 
        if(timeHour < 9) {
         timeHour ++;
         lcd.setCursor(3,0);
         lcd.print(timeHour);
-        oneHour ++;
+        currentHour ++;
       } else {
          timeHour ++;
          lcd.setCursor(2,0);
          lcd.print(timeHour);
-         oneHour ++;
+         currentHour ++;
       }
     }
     if(downArrowPressed == 1) {
@@ -197,18 +323,18 @@ void setTime() {
         lcd.setCursor(2,0);
         lcd.print("12");
         timeHour = 13;
-        oneHour = 13;
+        currentHour = 13;
        } 
        if(timeHour < 10) {
         timeHour --;
         lcd.setCursor(3,0);
         lcd.print(timeHour);
-        oneHour --;
+        currentHour --;
       } else {
          timeHour --;
          lcd.setCursor(2,0);
          lcd.print(timeHour);
-         oneHour --;
+         currentHour --;
       }
     }
   }
@@ -217,55 +343,44 @@ void setTime() {
        if(timeMinute == 59) {
          lcd.setCursor(5,0);
          lcd.print("00");
-         timeMinute = 0;
+         timeMinute = -1;
          timeHour --;
-         oneMinute = 0;
+         currentMinute = -1;
        } 
        if(timeMinute < 9) {
         timeMinute ++;
         lcd.setCursor(6,0);
         lcd.print(timeMinute);
-        oneMinute ++;
+        currentMinute ++;
       } else {
          timeMinute ++;
          lcd.setCursor(5,0);
          lcd.print(timeMinute);
-         oneMinute ++;
+         currentMinute ++;
       }
     }
     if(downArrowPressed == 1) {
-       if(timeMinute <= 1) {
+       if(timeMinute <= 0) {
          lcd.setCursor(5,0);
          lcd.print("59");
          timeMinute = 60;
-         oneMinute = 60;
+         currentMinute = 60;
        } 
        if(timeMinute < 9) {
         timeMinute --;
         lcd.setCursor(6,0);
         lcd.print(timeMinute);
-        oneMinute --;
+        currentMinute --;
       } else {
          timeMinute --;
          lcd.setCursor(5,0);
          lcd.print(timeMinute);
-         oneMinute --;
+         currentMinute --;
       }
     }
   }
   if(clockDisplayPosition == 3) {
-    if(timeDayLightCheck <= 0) {
-      lcd.setCursor(8,0);
-      lcd.print("am");
-      timeDayLightCheck ++;
-      dayLightCheck = 0;
-    }
-    if(timeDayLightCheck == 1) {
-      lcd.setCursor(8,0);
-      lcd.print("pm");
-      timeDayLightCheck = -1;
-      dayLightCheck = 1;
-    }
+    setAMPM();
   }
 }
 
@@ -325,7 +440,7 @@ void blinkTimeSet() {
   }
   if(clockDisplayPosition == 3) {
     if(barbar3 <= 0) {
-      if(timeDayLightCheck == 0) {
+      if(amPmDisplayString == " am") {
         lcd.setCursor(8,0);
         lcd.print("am");
         barbar3 ++;
@@ -356,13 +471,13 @@ void blinkTimeSet() {
   }
   if(clockDisplayPosition == 0) {
     if(barbar3 != 0) {
-       if(timeDayLightCheck == 0) {
+       if(amPmDisplayString == " am") {
         lcd.setCursor(8,0);
-        lcd.print("am");
+        lcd.print(" am");
         barbar3 ++;
       } else {
         lcd.setCursor(8,0);
-        lcd.print("pm");
+        lcd.print(" pm");
         barbar3 ++;
       }
     }
@@ -409,7 +524,7 @@ void setAlarm() {
        if(alarmMinute == 59) {
          lcd.setCursor(11,1);
          lcd.print("00");
-         alarmMinute = 0;
+         alarmMinute = -1;
        } 
        if(alarmMinute < 9) {
         alarmMinute ++;
@@ -439,7 +554,7 @@ void setAlarm() {
     }
   }
   if(alarmCount == 3) {
-    if(alarmDayLightCheck <= 0) {
+    if(alarmDayLightCheck == 0) {
       lcd.setCursor(14,1);
       lcd.print("am");
       alarmDayLightCheck ++;
@@ -447,7 +562,7 @@ void setAlarm() {
     if(alarmDayLightCheck == 1) {
       lcd.setCursor(14,1);
       lcd.print("pm");
-      alarmDayLightCheck = -1;
+      alarmDayLightCheck --;
     }
   }
 }
@@ -464,20 +579,29 @@ void changeAlarm() {
   }
 }
 
+int dayLightCheck() {
+	if(amPmDisplayString == " am")
+		return 0;
+	else
+		return 1;
+}
+
 void soundAlarm() {
+  DateTime now = rtc.now();
+
   if(soundAlarmGlitch == 0) {
    if(alarmCount == 0) {
-    if(alarmHour == oneHour) {
+    if(now.hour() == alarmHour) {
       soundAlarmCount = 1;
-       if(alarmMinute == oneMinute) {
+       if(now.minute() == alarmMinute) {
          soundAlarmCount = 2;
-          if(alarmDayLightCheck == dayLightCheck) {
+          if(alarmDayLightCheck == dayLightCheck()) {
             soundAlarmCount = 3;
          }  
       }
     }
     if(soundAlarmCount == 3) {
-      keepAlarmGoing = 1;
+      startAlarm();
     }
    }
   }
@@ -487,7 +611,7 @@ void soundAlarm() {
       foobarbaz ++;
     }
     if(foobarbaz == 1) {
-      digitalWrite(buzzer, LOW);
+      stopBuzzer();
       foobarbaz = -1;
     }
   }
@@ -549,7 +673,7 @@ void blinkAlarmSet() {
   }
   if(alarmCount == 3) {
     if(foobar3 <= 0) {
-      if(alarmDayLightCheck == 0) {
+      if(amPmDisplayString == " am") {
         lcd.setCursor(14,1);
         lcd.print("am");
         foobar3 ++;
@@ -580,7 +704,7 @@ void blinkAlarmSet() {
   }
   if(alarmCount == 0) {
     if(foobar3 != 0) {
-       if(alarmDayLightCheck == 0) {
+      if(amPmDisplayString == " am") {
         lcd.setCursor(14,1);
         lcd.print("am");
         foobar3 ++;
@@ -600,6 +724,12 @@ void stopAlarm() {
   alarmCount = 0;
   alarmHour = 0;
   alarmMinute = 0;
+  pressSnoozeOnce = 0;
+}
+
+void startAlarm() {
+  keepAlarmGoing = 1;
+  pressSnoozeOnce = 0;
 }
 
 void turnOnLight() {
@@ -645,24 +775,101 @@ void changeLEDcolor() {
   }
 }
 
-void loop() {
-  if(millis() > time_1 + 998) {
-    time_1 = millis();
-    Clock();
+void snooze() {
+  stopAlarmCount = 1;
+  alarmMinute = alarmMinute + snoozeTime;
+  lcd.setCursor(0,1);
+  lcd.print("Snoozing | ");
+  lcd.setCursor(11, 1);
+  lcd.print(snoozeTime);
+  lcd.setCursor(12, 1);
+  lcd.print("mins");
+  soundAlarmCount = 0;
+  keepAlarmGoing = 0;
+  stopAlarmCount = 0;
+  stopBuzzer();
+  pressSnoozeOnce = 1;
+}
+
+void initSnoozeDisplay() {
+  pressSnoozeButton ++;
+  if(pressSnoozeButton == 1) {
+    lcd.setCursor(0,1);
+    lcd.print("                ");
+    alarmDisplay();
+    pressSnoozeButton = -1;
+    blinkSnoozeTime = 0;
   }
+  if(pressSnoozeButton == 0) {
+    lcd.setCursor(0,1);
+    lcd.print("Snooze for");
+    lcd.setCursor(12,1);
+    lcd.print("mins");
+    blinkSnoozeTime = 1;
+  }
+}
+
+void blinkSnoozeDisplay() {
+  if(blinkSnoozeTime == 1) {
+    snoozeFoo ++;
+    if(snoozeFoo == 0) {
+      if(snoozeTime < 10) {
+        lcd.setCursor(11,1);
+        lcd.print(snoozeTime);
+      } else {
+        lcd.setCursor(10,1);
+        lcd.print(snoozeTime);
+      }
+    }
+    if(snoozeFoo == 1) {
+      lcd.setCursor(10,1);
+      lcd.print("  ");
+      snoozeFoo = -1;
+    }
+  }
+}
+
+void setSnoozeTime() {
+  if(blinkSnoozeTime == 1) {
+    if(upArrowPressed == 1) {
+      snoozeTime ++;
+    }
+    if(downArrowPressed == 1) {
+      snoozeTime --;
+    }
+    if(snoozeTime < 10) {
+     lcd.setCursor(11,1);
+     lcd.print(snoozeTime);
+    } else {
+     lcd.setCursor(10,1);
+     lcd.print(snoozeTime);
+    }
+  }
+  if(snoozeTime <= 0) {
+    snoozeTime = 1;
+  }
+}
+
+void stopBuzzer() {
+  digitalWrite(buzzer, LOW);
+}
+
+void loop() {
+  DateTime now = rtc.now();
+  Clock();
+  
   if(millis() > time_2 + 300) {
     time_2 = millis();
     blinkAlarmSet();
     blinkTimeSet();
+    blinkSnoozeDisplay();
   }
   if(millis() > time_3 + 300) {
     time_3 = millis();
     if(stopAlarmCount == 0){
       soundAlarm();
     } else {
-        digitalWrite(buzzer, LOW);
-        lcd.setCursor(8,1);
-        lcd.print("        ");
+        stopBuzzer();
     }
   }
   if (irrecv.decode(&results)) {
@@ -671,14 +878,17 @@ void loop() {
         downArrowPressed = 0;
         setAlarm();
         setTime();
+        setSnoozeTime();
     }
     if (results.value==0xFFE01F ){ // downArrow
         downArrowPressed = 1;
         upArrowPressed = 0;
         setAlarm();
         setTime();
+        setSnoozeTime();
     }
     if (results.value==0xFFA857 ){ // vol- button = "OK" button
+       alarmDisplay();
        changeAlarm();
     }
     if (results.value==0xFF629D ) { // vol+ button
@@ -686,6 +896,9 @@ void loop() {
     }
     if (results.value==0xFFE21D ) { // func/stop button
         stopAlarm();
+        lcd.setCursor(8,1);
+        lcd.print("        ");
+        alarmDisplay();
     }
     if (results.value==0xFFA25D ) { // power button
         if(controlLightCount == 0) {
@@ -694,13 +907,24 @@ void loop() {
           turnOffLight();
         }
     }
-    if (results.value==0xFFC23D ) { // >>/ button
+    if (results.value==0xFFC23D ) { // >>| button
         LEDstatus ++;
         changeLEDcolor();
     }
-    if (results.value==0xFF22DD ) { // /<< button
+    if (results.value==0xFF22DD ) { // |<< button
         LEDstatus --;
         changeLEDcolor();
+    }
+    if (results.value==0xFF9867 ) { // EQ button
+        if(pressSnoozeOnce == 0) {
+          snooze();
+        }
+    }
+    if (results.value==0xFF18E7 ) { // 2 button
+        initSnoozeDisplay();
+    }
+    if (results.value==0xFFC23D ) { // >>| button
+        initSnoozeDisplay();
     }
     irrecv.resume();
   }
