@@ -18,6 +18,8 @@ unsigned long time_3 = 0;
 boolean clockIsRunning = true;
 boolean amFlag = false;
 boolean updateAmPm = false;
+boolean blinkFlag = true;
+
 String amPmDisplayString = "";
 
 int foobar1 = 0; //these are just random ints to help keep spots within certain functions
@@ -52,7 +54,7 @@ int currentMonth = 5;
 int currentDay = 11;
 
 int alarmCount = 0;
-int clockDisplayPosition = 0;
+int clockDisplayPosition = 1;
 int soundAlarmCount = 0;
 int upArrowPressed = 0;
 int downArrowPressed = 0;
@@ -105,6 +107,9 @@ void printAmPm() {
 }
 
 void printPaddedHour(int hour) {
+  if(hour < 1) hour = 12;
+  if(hour > 12) hour = 1;
+  
   lcd.setCursor(2,0);
 
   if(hour < 10) {
@@ -121,7 +126,10 @@ void printHourMinuteColon() {
 }
 
 void printPaddedMinute(int minute) {
-   lcd.setCursor(5,0);
+  if(timeMinute < 0) timeMinute = 59;
+  if(timeMinute > 59) timeMinut = 0;
+  
+  lcd.setCursor(5,0);
 
   if(minute < 10) {
     lcd.print("0");
@@ -291,184 +299,75 @@ void resetClockDisplayData() {
 }
 
 void setAMPM() {
-	lcd.setCursor(8,0);
-	lcd.print(amPmDisplayString);
+  lcd.setCursor(8,0);
+  lcd.print(amPmDisplayString);
 
-	updateAmPm = true;
+  updateAmPm = true;
 }
 
 void setTime() {
   if(clockDisplayPosition == 1) {
-     if(upArrowPressed == 1) {
-       if(timeHour >= 12) {
-        lcd.setCursor(2,0);
-        lcd.print("01");
-        timeHour = 0;
-        currentHour = 0;
-       } 
-       if(timeHour < 9) {
-        timeHour ++;
-        lcd.setCursor(3,0);
-        lcd.print(timeHour);
-        currentHour ++;
-      } else {
-         timeHour ++;
-         lcd.setCursor(2,0);
-         lcd.print(timeHour);
-         currentHour ++;
-      }
-    }
-    if(downArrowPressed == 1) {
-       if(timeHour <= 1) {
-        lcd.setCursor(2,0);
-        lcd.print("12");
-        timeHour = 13;
-        currentHour = 13;
-       } 
-       if(timeHour < 10) {
-        timeHour --;
-        lcd.setCursor(3,0);
-        lcd.print(timeHour);
-        currentHour --;
-      } else {
-         timeHour --;
-         lcd.setCursor(2,0);
-         lcd.print(timeHour);
-         currentHour --;
-      }
-    }
+    setClockHour(); 
   }
+  
   if(clockDisplayPosition == 2) {
-     if(upArrowPressed == 1) {
-       if(timeMinute == 59) {
-         lcd.setCursor(5,0);
-         lcd.print("00");
-         timeMinute = -1;
-         timeHour --;
-         currentMinute = -1;
-       } 
-       if(timeMinute < 9) {
-        timeMinute ++;
-        lcd.setCursor(6,0);
-        lcd.print(timeMinute);
-        currentMinute ++;
-      } else {
-         timeMinute ++;
-         lcd.setCursor(5,0);
-         lcd.print(timeMinute);
-         currentMinute ++;
-      }
-    }
-    if(downArrowPressed == 1) {
-       if(timeMinute <= 0) {
-         lcd.setCursor(5,0);
-         lcd.print("59");
-         timeMinute = 60;
-         currentMinute = 60;
-       } 
-       if(timeMinute < 9) {
-        timeMinute --;
-        lcd.setCursor(6,0);
-        lcd.print(timeMinute);
-        currentMinute --;
-      } else {
-         timeMinute --;
-         lcd.setCursor(5,0);
-         lcd.print(timeMinute);
-         currentMinute --;
-      }
-    }
+    setClockMinute();
   }
+  
   if(clockDisplayPosition == 3) {
     setAMPM();
   }
 }
 
+void printBlankHour() {
+  lcd.setCursor(2,0);
+  lcd.print("  ");
+}
+
+void printBlankMinute() {
+  lcd.setCursor(5,0);
+  lcd.print("  ");
+}
+
+void printBlinkHour() {
+    if(blinkFlag) {
+      printBlankHour();
+      blinkFlag = false;
+    } else {
+      printPaddedHour(timeHour);
+      blinkFlag = true;
+    }  
+}
+
+void printBlinkMinute() {
+    if(blinkFlag) {
+      printBlankMinute();
+      blinkFlag = false;
+    } else {
+      printPaddedMinute(timeHour);
+      blinkFlag = true;
+    }   
+}
+
 void blinkTimeSet() {
   if(clockDisplayPosition == 1) {
-    if(barbar1 <= 0) {
-      if(timeHour < 10) {
-        lcd.setCursor(3, 0);
-        lcd.print(timeHour);
-        lcd.setCursor(2, 0);
-        lcd.print("0");
-        barbar1 ++;
-      } else {
-        lcd.setCursor(2, 0);
-        lcd.print(timeHour);
-        barbar1 ++;
-      }
-    }
-    if(barbar1 == 1) {
-      lcd.setCursor(2,0);
-      lcd.print("  ");
-      barbar1 = -1;
-    }
+    printBlinkHour();
   }
+  
   if(clockDisplayPosition == 2) {
-    if(barbar2 <= 0) {
-      if(timeMinute < 10) {
-        lcd.setCursor(6,0);
-        lcd.print(timeMinute);
-        lcd.setCursor(5,0);
-        lcd.print("0");
-        barbar2 ++;
-      } else {
-        lcd.setCursor(5,0);
-        lcd.print(timeMinute);
-        barbar2 ++;
-      }
-    }
-    if(barbar2 == 1) {
-      lcd.setCursor(5,0);
-      lcd.print("  ");
-      barbar2 = -1;
-    }
-    if(barbar1 != 0) {
-      if(timeHour < 10) {
-        lcd.setCursor(3, 0);
-        lcd.print(timeHour);
-        lcd.setCursor(2, 0);
-        lcd.print("0");
-        barbar1 ++;
-      } else {
-        lcd.setCursor(2, 0);
-        lcd.print(timeHour);
-        barbar1 ++;
-      }
-    }
+    printBlinkMinute();
+    // race condition warning
+    // must print the hour again in case it was last cleared by millis loop
+    printPaddedHour(timeHour);
   }
+
   if(clockDisplayPosition == 3) {
-    if(barbar3 <= 0) {
-      if(amPmDisplayString == " am") {
-        lcd.setCursor(8,0);
-        lcd.print("am");
-        barbar3 ++;
-      } else {
-        lcd.setCursor(8,0);
-        lcd.print("pm");
-        barbar3 ++;
-      }
-    }
-    if(barbar3 == 1) {
-      lcd.setCursor(8,0);
-      lcd.print("  ");
-      barbar3 = -1;
-    }
-    if(barbar2 != 0) {
-       if(timeMinute < 10) {
-         lcd.setCursor(6,0);
-         lcd.print(timeMinute);
-         lcd.setCursor(5,0);
-         lcd.print("0");
-         barbar2 ++;
-        } else {
-          lcd.setCursor(5,0);
-          lcd.print(timeMinute);
-          barbar2 ++;
-      } 
-    }
+    printBlinkAmPm();
+    // race condition warning
+    // must print the hour again in case it was last cleared by millis loop
+    printPaddedMinute(timeMinute);  
   }
+ 
   if(clockDisplayPosition == 0) {
     if(barbar3 != 0) {
        if(amPmDisplayString == " am") {
