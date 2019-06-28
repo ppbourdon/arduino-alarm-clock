@@ -28,6 +28,7 @@ int selectedAlarmMinute = 0;
 int selectedSnoozeMinute = 0;
 String selectedClockAmPm = "AM";
 String selectedAlarmAmPm = "AM";
+boolean clockIsRunning = false;  
 
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 IRrecv irrecv(RECV_PIN);
@@ -53,6 +54,7 @@ void resetClockVariables() {
 	selectedSnoozeMinute = 0;
 	selectedClockAmPm = "AM";
 	selectedAlarmAmPm = "AM";
+	clockIsRunning = false;
 }
 
 void enterOrExitMenu() {
@@ -78,7 +80,7 @@ void displayTopMenu() {
 
 void clearScreen() {
     lcd.clear();
-  	lcd.setCursor(2,0);
+    lcd.setCursor(2,0);
 }
 
 void displaySetClock() {
@@ -197,12 +199,68 @@ void cycleMenu(String direction) {
 	displayMenu();
 }
 
+void displayClock() {
+	DateTime now = rtc.now();
+  lcd.setCursor(2,0);
+
+	// display hour
+	if(now.hour() > 12) {
+		displayPaddedValue(now.hour() - 12);
+	} else {
+		displayPaddedValue(now.hour());
+	}
+
+	// display semicolon
+	lcd.print(":");
+
+	// display minute
+	displayPaddedValue(now.minute());
+
+	// display semicolon
+	lcd.print(":");
+
+	// display second
+	displayPaddedValue(now.second());
+
+	lcd.print(" ");
+
+	// display am/pm
+	lcd.print(selectedClockAmPm);
+
+  lcd.setCursor(0, 1);
+  lcd.print("                ");
+}
+
+void displayPaddedValue(int val) {
+	if(val < 10) {
+		lcd.print("0");
+		lcd.print(val);
+	} else {
+		lcd.print(val);
+	}
+}
+
+void adjustClock() {
+	if(selectedClockAmPm == "AM")
+		rtc.adjust(DateTime(0,0,0, selectedClockHour, selectedClockMinute, 0));
+	else
+		rtc.adjust(DateTime(0,0,0, selectedClockHour + 12, selectedClockMinute, 0));
+}
+
+void runClock() {
+	adjustClock();
+	clearScreen();
+	displayClock();
+	rtc.begin();
+	clockIsRunning = true;
+}
+
 void selectCurrentMenuItem() {
 	if(currentMenu == "top") {
 		if(selectedTopMenuItem == "setup") {
 			currentMenu = "top|clock";
 		} else {
-      // run the clock here
+			runClock();
 		}
 	}
 	else if(currentMenu == "top|clock") currentMenu = "top|clock|hour";
@@ -331,8 +389,11 @@ void handleRCEvents() {
 }
 
 void loop() {
-  if (irrecv.decode(&results)) {
-	handleRCEvents();
-    irrecv.resume();
-  }
+	if (irrecv.decode(&results)) {
+		handleRCEvents();
+   	 	irrecv.resume();
+  	} else {
+		if(clockIsRunning)
+			displayClock();
+	}
 }
