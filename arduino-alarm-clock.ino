@@ -26,9 +26,12 @@ int selectedClockMinute = 0;
 int selectedAlarmHour = 0;
 int selectedAlarmMinute = 0;
 int selectedSnoozeMinute = 0;
+int snoozeHour = 0;
+int snoozeMinute = 0;
 String selectedClockAmPm = "AM";
 String selectedAlarmAmPm = "AM";
-boolean clockIsRunning = false;  
+boolean clockIsRunning = false;
+boolean snoozeIsOn = false;
 
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 IRrecv irrecv(RECV_PIN);
@@ -46,20 +49,23 @@ void setup() {
 }
 
 void resetClockVariables() {
-	currentMenu = "null";
 	selectedClockHour = 0;
 	selectedClockMinute = 0;
 	selectedAlarmHour = 0;
 	selectedAlarmMinute = 0;
 	selectedSnoozeMinute = 0;
+  snoozeHour = 0;
+  snoozeMinute = 0;
 	selectedClockAmPm = "AM";
 	selectedAlarmAmPm = "AM";
 	clockIsRunning = false;
+  snoozeIsOn = false;
 }
 
 void enterOrExitMenu() {
 	if(currentMenu == "null") {
 		currentMenu = "top";
+    resetClockVariables();
 		displayMenu();	
 	} else {
 		exitMenu();
@@ -158,7 +164,8 @@ void printSelectedAmPm(String selectedValue) {
 
 void exitMenu() {
 	lcd.clear();
-	resetClockVariables();
+	//resetClockVariables();
+  currentMenu = "null";
 }
 
 void cycleMenu(String direction) {
@@ -225,10 +232,13 @@ void displayClock() {
 	lcd.print(" ");
 
 	// display am/pm
+  if( now.hour() == 12 && selectedClockAmPm == "AM" ) selectedClockAmPm = "PM";
+  if( now.hour() == 24 && selectedClockAmPm == "PM" ) selectedClockAmPm = "AM";
 	lcd.print(selectedClockAmPm);
 
   lcd.setCursor(0, 1);
   lcd.print("                ");
+ 
 }
 
 void displayPaddedValue(int val) {
@@ -254,6 +264,42 @@ void runClock() {
 	rtc.begin();
 	clockIsRunning = true;
 }
+
+
+void soundAlarm() {
+  if( selectedClockAmPm == "AM" && 
+      rtc.now().hour() == selectedAlarmHour &&
+      rtc.now().minute() == selectedAlarmMinute &&
+      rtc.now().second() == 0 ) {
+    digitalWrite(buzzer, HIGH);  
+  }
+
+  if( selectedClockAmPm == "PM" && 
+      rtc.now().hour() - 12 == selectedAlarmHour &&
+      rtc.now().minute() == selectedAlarmMinute && 
+      rtc.now().second() == 0 ) {
+    digitalWrite(buzzer, HIGH);       
+  }
+
+  if( rtc.now().hour() == snoozeHour && 
+      rtc.now().minute() == snoozeMinute &&
+      rtc.now().second() == 0 &&
+      snoozeIsOn) {
+    digitalWrite(buzzer, HIGH);
+  }
+
+}
+
+void setSnoozeTime() {
+  snoozeHour = rtc.now().hour();
+  snoozeMinute = rtc.now().minute() + selectedSnoozeMinute;
+}
+
+void stopAlarm() {
+  digitalWrite(buzzer, LOW);
+  snoozeIsOn = false;
+}
+
 
 void selectCurrentMenuItem() {
 	if(currentMenu == "top") {
@@ -373,6 +419,7 @@ void handleRCEvents() {
     if (results.value==0xFF629D ) { // vol+ button
 	}
     if (results.value==0xFFE21D ) { // func/stop button
+      stopAlarm();
 	}
     if (results.value==0xFFA25D ) { // power button
     }
@@ -382,7 +429,10 @@ void handleRCEvents() {
     if (results.value==0xFF22DD ) { // |<< button
 		gotoParentMenu();
     }
-    if (results.value==0xFF9867 ) { // EQ button
+    if (results.value==0xFF9867 ) {
+        stopAlarm();
+        setSnoozeTime();
+        snoozeIsOn = true; // EQ button
     }
     if (results.value==0xFF18E7 ) { // 2 button
     }
@@ -393,7 +443,9 @@ void loop() {
 		handleRCEvents();
    	 	irrecv.resume();
   	} else {
-		if(clockIsRunning)
+		if(clockIsRunning) {
+      soundAlarm();
 			displayClock();
+		}
 	}
 }
